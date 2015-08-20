@@ -66,11 +66,15 @@ class DataGenerator(object):
         :param text(a sttring):
         :return a list of words:
         '''
-        return T.text_to_word_sequence(text, filters=T.base_filter(), lower=True, split=" ")
-        
+        sequence = T.text_to_word_sequence(text, filters=T.base_filter(), lower=True, split=" ")
+        for i in range(len(sequence)):
+            sequence[i]=re.sub(r'[0-9]+','<NUMBER>',sequence[i])
+        return sequence
+
     def debug(self):
-        data=self.getData("./data/data.json")
-        strings=self.getStrings(data)
+        #data=self.getData("./data/data.json")
+        #strings=self.getStrings(data)
+        strings=["My number is 123456."]
         print(strings[0:10])
         sequences=[]
         for str in strings:
