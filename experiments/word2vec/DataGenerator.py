@@ -2,7 +2,7 @@ __author__ = 'Hujie Wang'
 
 import json
 import re
-
+import keras.preprocessing.text as T
 
 FLAGS = re.VERBOSE | re.MULTILINE | re.DOTALL
 WHITESPACE = re.compile(r'[ \t\n\r]*', FLAGS)
@@ -28,17 +28,29 @@ class DataGenerator(object):
         :param fname(Reddit comment JSON file):
         :return a dict of JSON object:
         '''
-        with open('./data/data.json', encoding='utf-8') as data_file:
+        with open(fname, encoding='utf-8') as data_file:
             data = json.loads(data_file.read(),cls=ConcatJSONDecoder)
         return data
 
-    def getSentences(self,data):
+    def getStrings(self,data):
         '''
-        Return a list of sentences(string) given a JSON data
+        Return a list of strings given a JSON data
 
         :param data (JSON)
         :return: a list of strings
         '''
+
+        list_of_strings=[]
+        for item in data:
+            list_of_strings.append(item['body'])
+        return list_of_strings
+
+    def string2sentences(self,str):
+        '''
+        :param str:
+        :return a list of sentences:
+        '''
+        return [str]
 
     def write(self,fname,list_of_sentences):
         '''
@@ -53,3 +65,17 @@ class DataGenerator(object):
         :param text(a sttring):
         :return a list of words:
         '''
+        return T.text_to_word_sequence(text, filters=T.base_filter(), lower=True, split=" ")
+
+    def debug(self):
+        data=self.getData("./data/data.json")
+        strings=self.getStrings(data)
+        sequences=[]
+        for str in strings:
+            sentences=self.string2sentence(str)
+            for sentence in sentences:
+                sequences.append(self.text2sequence(sentence))
+        print(sequences[0:10])
+
+d=DataGenerator("./data")
+d.debug()
