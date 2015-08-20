@@ -3,6 +3,7 @@ __author__ = 'Hujie Wang'
 import json
 import re
 import keras.preprocessing.text as T
+from tqdm import tqdm
 
 FLAGS = re.VERBOSE | re.MULTILINE | re.DOTALL
 WHITESPACE = re.compile(r'[ \t\n\r]*', FLAGS)
@@ -20,15 +21,13 @@ class ConcatJSONDecoder(json.JSONDecoder):
         return objs
 
 class DataGenerator(object):
-    def __init__(self,data_path):
-        self.data_path=data_path
 
     def getData(self,fname):
         '''
         :param fname(Reddit comment JSON file):
         :return a dict of JSON object:
         '''
-        with open(fname, encoding='utf-8') as data_file:
+        with open(fname) as data_file:
             data = json.loads(data_file.read(),cls=ConcatJSONDecoder)
         return data
 
@@ -41,8 +40,8 @@ class DataGenerator(object):
         '''
 
         list_of_strings=[]
-        for item in data:
-            list_of_strings.append(item['body'])
+        for i in range(len(data)):
+            list_of_strings.append(data[i]['body'])
         return list_of_strings
 
     def string2sentences(self,str):
@@ -53,12 +52,21 @@ class DataGenerator(object):
         return list(filter(bool,re.split(r'[;,.!?]+',str)))
 
 
-    def write(self,fname,list_of_sentences):
+    def write(self,fname,sequences):
         '''
-        Append list of sentences(list of words) into a file(in binary), according to the data format of word2vec
+        Append list of tokens into a file(in binary), according to the data format of word2vec
         :param fname:
         :param l (list of strings):
         '''
+        print('Writing data into '+fname)
+        with open(fname,'wb') as fout:
+            for i in tqdm(range(len(sequences))):
+                for j in range(len(sequences[i])):
+                    fout.write(bytes(sequences[i][j], 'UTF-8'))
+                    if j!=len(sequences[i])-1:
+                        fout.write(bytes(' ', 'UTF-8'))
+                    else:
+                        fout.write(bytes('\n', 'UTF-8'))
 
     def text2sequence(self,text):
         '''
@@ -68,22 +76,31 @@ class DataGenerator(object):
         '''
         sequence = T.text_to_word_sequence(text, filters=T.base_filter(), lower=True, split=" ")
         for i in range(len(sequence)):
-            sequence[i]=re.sub(r'[0-9]+','<NUMBER>',sequence[i])
+            sequence[i]=re.sub(r'^[0-9]+$','<NUMBER>',sequence[i])
+            self.number_of_tokens+=1
         return sequence
 
-    def debug(self):
-        #data=self.getData("./data/data.json")
-        #strings=self.getStrings(data)
-        strings=["My number is 123456."]
-        print(strings[0:10])
-        sequences=[]
-        for str in strings:
-            sentences=self.string2sentences(str)
-            for sentence in sentences:
-                sequence=self.text2sequence(sentence)
-                sequences.append(sequence)
-        print(sequences[0:10])
+    def generate(self,fin_path,fout_path):
 
-d=DataGenerator("./data")
-d.debug()
+        self.number_of_tokens=0
+
+        data=self.getData(fin_path)
+        strings=self.getStrings(data)
+        sequences=[]
+        self.number_of_comments=len(strings)
+        print('Converting reddit comments into tokens...')
+        for i in tqdm(range(len(strings))):
+            sentences=self.string2sentences(strings[i])
+            for sentence in sentences:
+                sequences.append(self.text2sequence(sentence))
+        self.write(fout_path,sequences)
+        print('Data generation completed!')
+        print('Number of comments:'+str(self.number_of_comments))
+        print('Number of tokens:'+str(self.number_of_tokens))
+
+
+d=DataGenerator()
+d.generate("./data/data.json","./data/data_generated")
+
+
 
