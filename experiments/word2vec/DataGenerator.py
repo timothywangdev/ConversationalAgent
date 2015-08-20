@@ -50,7 +50,8 @@ class DataGenerator(object):
         :param str:
         :return a list of sentences:
         '''
-        return [str]
+        return list(filter(bool,re.split(r'[;,.!?]+',str)))
+
 
     def write(self,fname,list_of_sentences):
         '''
@@ -66,16 +67,19 @@ class DataGenerator(object):
         :return a list of words:
         '''
         return T.text_to_word_sequence(text, filters=T.base_filter(), lower=True, split=" ")
-
+        
     def debug(self):
         data=self.getData("./data/data.json")
         strings=self.getStrings(data)
+        print(strings[0:10])
         sequences=[]
         for str in strings:
-            sentences=self.string2sentence(str)
+            sentences=self.string2sentences(str)
             for sentence in sentences:
-                sequences.append(self.text2sequence(sentence))
+                sequence=self.text2sequence(sentence)
+                sequences.append(sequence)
         print(sequences[0:10])
 
 d=DataGenerator("./data")
 d.debug()
+
