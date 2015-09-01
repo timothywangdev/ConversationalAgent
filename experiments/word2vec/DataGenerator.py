@@ -5,11 +5,12 @@ import re
 import keras.preprocessing.text as T
 from tqdm import tqdm
 import time
+import os
 
 FLAGS = re.VERBOSE | re.MULTILINE | re.DOTALL
 WHITESPACE = re.compile(r'[ \t\n\r]*', FLAGS)
 FOUT_PATH="./data/data_generated"
-SUBREDDIT_DICT=[]
+SELECTED_SUBREDDIT=[]
 number_of_tokens=0
 number_of_comments=0
 last_number_of_comments=0
@@ -29,7 +30,7 @@ class ConcatJSONDecoder(json.JSONDecoder):
 def do(fname, subreddit=[]):
         '''
         :param fname(Reddit comment JSON file)
-        :      subreddit(a dict of list of subreddit names)
+        :      subreddit(a list of subreddit names)
         :return a dict of JSON object:
         '''
         global start_time
@@ -37,12 +38,12 @@ def do(fname, subreddit=[]):
         global number_of_comments
         global last_number_of_comments
         global FOUT_PATH
-        global SUBREDDIT_DICT
+        global SELECTED_SUBREDDIT
         start_time = time.time()
         number_of_tokens=0
         number_of_comments=0
         last_number_of_comments=0
-        SUBREDDIT_DICT=subreddit
+        SELECTED_SUBREDDIT=subreddit
         print('Converting reddit comments into tokens...')
         with open(fname) as data_file:
             data = json.loads(data_file.read(),cls=ConcatJSONDecoder)
@@ -63,7 +64,7 @@ def getString(obj):
         number_of_comments+=1
         current_time=time.time()
         #duration=int((current_time - start_time)*1000)
-        if number_of_comments%1000==0:
+        if number_of_comments%100000==0:
             print(number_of_comments)
             #print(repr((number_of_comments-last_number_of_comments)/duration )+" comments per second" )
             #last_number_of_comments=number_of_comments
@@ -83,14 +84,14 @@ def write(fname,sequences):
         :param fname:
         :param l (list of strings):
         '''
-        with open(fname,'wb') as fout:
+        with open(fname,'ab') as fout:
             for i in range(len(sequences)):
-                for j in range(len(sequences[i])):
-                    fout.write(bytes(sequences[i][j], 'UTF-8'))
-                    if j!=len(sequences[i])-1:
-                        fout.write(bytes(' ', 'UTF-8'))
-                    else:
-                        fout.write(bytes('\n', 'UTF-8'))
+                #for j in range(len(sequences[i])):
+                fout.write(bytes(sequences[i], 'UTF-8'))
+                if i!=len(sequences)-1:
+                    fout.write(bytes(' ', 'UTF-8'))
+                else:
+                    fout.write(bytes('\n', 'UTF-8'))
 
 def text2sequence(text):
         '''
@@ -106,18 +107,20 @@ def text2sequence(text):
         return sequence
 
 def generate(obj):
-    if obj['subreddit'] in SUBREDDIT_DICT or not SUBREDDIT_DICT:
+    if obj['subreddit'] in SELECTED_SUBREDDIT or not SELECTED_SUBREDDIT:
         sequences=[]
         global number_of_tokens
         number_of_tokens+=1
         sentences=string2sentences(getString(obj))
         for sentence in sentences:
-            sequences.append(text2sequence(sentence))
-        party = SUBREDDIT_DICT[obj['subreddit']]
-        if not SUBREDDIT_DICT:
+            #sequences.append(text2sequence(sentence))
+            sequences += text2sequence(sentence)
+        if not SELECTED_SUBREDDIT:
             write(FOUT_PATH, sequences)
         else:
-            write('./data/'+party+'.json', sequences)
-
-
+            party = obj['subreddit']
+            write('./data/'+party+'.sub', sequences)
+            with open('./data/'+party+'.aut', 'a') as author:
+                author.write(obj['author'])
+                author.write('\n')
 

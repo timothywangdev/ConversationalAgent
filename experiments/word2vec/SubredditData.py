@@ -1,11 +1,14 @@
 from DataGenerator import *
+import os
 
-LEFT_PARTY = ['liberal', 'alltheleft']
-RIGHT_PARTY = ['new_right', 'conservative', 'republicans']
-LEFT_RIGHT_DICT = dict()
-for sub in LEFT_PARTY:
-    LEFT_RIGHT_DICT[sub] = 'leftparty'
-for sub in RIGHT_PARTY:
-    LEFT_RIGHT_DICT[sub] = 'rightparty'
+SUBREDDITS = ['liberal', 'alltheleft', 'new_right', 'conservative', 'republicans']
 
-do('./data/data.json', subreddit=LEFT_RIGHT_DICT)
+for sub in SUBREDDITS:
+    sub_file = './data/'+sub+'.sub'
+    sub_author_file = './data/'+sub+'.aut'
+    if os.path.exists(sub_file):
+        os.remove(sub_file)
+    if os.path.exists(sub_author_file):
+        os.remove(sub_author_file)
+
+do('./data/RC_2015-03.json', subreddit=SUBREDDITS)
