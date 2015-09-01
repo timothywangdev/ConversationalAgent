@@ -9,7 +9,7 @@ import time
 FLAGS = re.VERBOSE | re.MULTILINE | re.DOTALL
 WHITESPACE = re.compile(r'[ \t\n\r]*', FLAGS)
 FOUT_PATH="./data/data_generated"
-SELECTED_SUBREDDIT=[]
+SUBREDDIT_DICT=[]
 number_of_tokens=0
 number_of_comments=0
 last_number_of_comments=0
@@ -26,9 +26,10 @@ class ConcatJSONDecoder(json.JSONDecoder):
             generate(obj)
         return None
 
-def do(fname, fout="./data/data_generated", subreddit=[]):
+def do(fname, subreddit=[]):
         '''
-        :param fname(Reddit comment JSON file):
+        :param fname(Reddit comment JSON file)
+        :      subreddit(a dict of list of subreddit names)
         :return a dict of JSON object:
         '''
         global start_time
@@ -36,13 +37,12 @@ def do(fname, fout="./data/data_generated", subreddit=[]):
         global number_of_comments
         global last_number_of_comments
         global FOUT_PATH
-        global SELECTED_SUBREDDIT
+        global SUBREDDIT_DICT
         start_time = time.time()
         number_of_tokens=0
         number_of_comments=0
         last_number_of_comments=0
-        FOUT_PATH=fout
-        SELECTED_SUBREDDIT=subreddit
+        SUBREDDIT_DICT=subreddit
         print('Converting reddit comments into tokens...')
         with open(fname) as data_file:
             data = json.loads(data_file.read(),cls=ConcatJSONDecoder)
@@ -106,14 +106,18 @@ def text2sequence(text):
         return sequence
 
 def generate(obj):
-    if obj['subreddit'] in SELECTED_SUBREDDIT or not SELECTED_SUBREDDIT:
+    if obj['subreddit'] in SUBREDDIT_DICT or not SUBREDDIT_DICT:
         sequences=[]
         global number_of_tokens
         number_of_tokens+=1
         sentences=string2sentences(getString(obj))
         for sentence in sentences:
             sequences.append(text2sequence(sentence))
-        write(FOUT_PATH,sequences)
+        party = SUBREDDIT_DICT[obj['subreddit']]
+        if not SUBREDDIT_DICT:
+            write(FOUT_PATH, sequences)
+        else:
+            write('./data/'+party+'.json', sequences)
 
 
 
