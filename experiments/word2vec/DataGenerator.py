@@ -4,13 +4,15 @@ import json
 import re
 import keras.preprocessing.text as T
 from tqdm import tqdm
+import time
 
 FLAGS = re.VERBOSE | re.MULTILINE | re.DOTALL
 WHITESPACE = re.compile(r'[ \t\n\r]*', FLAGS)
 FOUT_PATH="./data/data_generated"
 number_of_tokens=0
 number_of_comments=0
-
+last_number_of_comments=0
+start_time=None
 class ConcatJSONDecoder(json.JSONDecoder):
     def decode(self, s, _w=WHITESPACE.match):
         s_len = len(s)
@@ -28,8 +30,14 @@ def do(fname):
         :param fname(Reddit comment JSON file):
         :return a dict of JSON object:
         '''
+        global start_time
+        global number_of_tokens
+        global number_of_comments
+        global last_number_of_comments
+        start_time = time.time()
         number_of_tokens=0
         number_of_comments=0
+        last_number_of_comments=0
         print('Converting reddit comments into tokens...')
         with open(fname) as data_file:
             data = json.loads(data_file.read(),cls=ConcatJSONDecoder)
@@ -45,7 +53,15 @@ def getString(obj):
         :return: a list of strings
         '''
         global number_of_comments
+        global start_time
+        global last_number_of_comments
         number_of_comments+=1
+        current_time=time.time()
+        #duration=int((current_time - start_time)*1000)
+        if number_of_comments%1000==0:
+            print(number_of_comments)
+            #print(repr((number_of_comments-last_number_of_comments)/duration )+" comments per second" )
+            #last_number_of_comments=number_of_comments
         return obj['body']
 
 def string2sentences(str):
