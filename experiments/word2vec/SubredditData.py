@@ -1,5 +1,7 @@
 from DataGenerator import *
 
+do('./data/data.json')
+
 do('./data/data.json', './data/leftwing', 
         subreddit=['liberal', 'alltheleft'])
 

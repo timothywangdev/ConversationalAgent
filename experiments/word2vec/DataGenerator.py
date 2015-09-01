@@ -35,20 +35,20 @@ def do(fname, fout="./data/data_generated", subreddit=[]):
         global number_of_tokens
         global number_of_comments
         global last_number_of_comments
+        global FOUT_PATH
+        global SELECTED_SUBREDDIT
         start_time = time.time()
         number_of_tokens=0
         number_of_comments=0
         last_number_of_comments=0
-        global FOUT_PATH
         FOUT_PATH=fout
-        global SELECTED_SUBREDDIT
         SELECTED_SUBREDDIT=subreddit
         print('Converting reddit comments into tokens...')
         with open(fname) as data_file:
             data = json.loads(data_file.read(),cls=ConcatJSONDecoder)
         print('Data generation completed!')
-        print('Number of comments:'+str(self.number_of_comments))
-        print('Number of tokens:'+str(self.number_of_tokens))
+        print('Number of comments:'+str(number_of_comments))
+        print('Number of tokens:'+str(number_of_tokens))
 
 def getString(obj):
         '''
@@ -115,6 +115,5 @@ def generate(obj):
             sequences.append(text2sequence(sentence))
         write(FOUT_PATH,sequences)
 
-do("./data/data.json")
 
 
