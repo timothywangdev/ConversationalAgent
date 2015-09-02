@@ -5,7 +5,13 @@ import re
 import keras.preprocessing.text as T
 from tqdm import tqdm
 import time
-import os
+import string
+import codecs
+
+from progressbar import AnimatedMarker, Bar, BouncingBar, Counter, ETA, \
+     FileTransferSpeed, FormatLabel, Percentage, \
+    ProgressBar, ReverseBar, RotatingMarker, \
+    SimpleProgress, Timer
 
 FLAGS = re.VERBOSE | re.MULTILINE | re.DOTALL
 WHITESPACE = re.compile(r'[ \t\n\r]*', FLAGS)
@@ -15,17 +21,6 @@ number_of_tokens=0
 number_of_comments=0
 last_number_of_comments=0
 start_time=None
-class ConcatJSONDecoder(json.JSONDecoder):
-    def decode(self, s, _w=WHITESPACE.match):
-        s_len = len(s)
-
-        objs = []
-        end = 0
-        while end != s_len:
-            obj, end = self.raw_decode(s, idx=_w(s, end).end())
-            end = _w(s, end).end()
-            generate(obj)
-        return None
 
 def do(fname, subreddit=[]):
         '''
@@ -45,8 +40,27 @@ def do(fname, subreddit=[]):
         last_number_of_comments=0
         SELECTED_SUBREDDIT=subreddit
         print('Converting reddit comments into tokens...')
+
+        widgets = ['Speed: ', Percentage(), ' ', Bar(marker=RotatingMarker()),
+               ' ', ETA()]
+
+        '''
+        maxval: number of json objects(lines) in a file (Each line is a json object)
+
+        data.json  (272  MB, time: 00:02:30): maxval=468317
+        RC_2015-03 (32.6 GB, time: 02:32:34): maxval=54564441
+        '''
+
+        pbar = ProgressBar(widgets=widgets, maxval=54564441).start()
+        nline=0
         with open(fname) as data_file:
-            data = json.loads(data_file.read(),cls=ConcatJSONDecoder)
+            for line in data_file:
+                obj = json.loads(line)
+                generate(obj)
+                pbar.update(nline+1)
+                nline+=1
+        pbar.finish()
+
         print('Data generation completed!')
         print('Number of comments:'+str(number_of_comments))
         print('Number of tokens:'+str(number_of_tokens))
@@ -56,7 +70,7 @@ def getString(obj):
         Return a list of strings given a JSON data
 
         :param data (JSON)
-        :return: a list of strings
+        :return: a list of stringswjwsz
         '''
         global number_of_comments
         global start_time
@@ -84,14 +98,30 @@ def write(fname,sequences):
         :param fname:
         :param l (list of strings):
         '''
-        with open(fname,'ab') as fout:
+        with codecs.open(fname,'ab','utf-8') as fout:
             for i in range(len(sequences)):
-                #for j in range(len(sequences[i])):
-                fout.write(bytes(sequences[i], 'UTF-8'))
-                if i!=len(sequences)-1:
-                    fout.write(bytes(' ', 'UTF-8'))
-                else:
-                    fout.write(bytes('\n', 'UTF-8'))
+                if len(sequences[i])==0:
+                    continue
+                for j in range(len(sequences[i])):
+                    fout.write(sequences[i][j])
+                    if j!=len(sequences[i])-1:
+                        fout.write(u' ')
+                    else:
+                        fout.write(u'\n')
+
+def base_filter():
+    f = string.punctuation
+    f = f.replace("'", '')
+    f += '\t\n'
+    return f
+
+def text_to_word_sequence(text, filters=base_filter(), lower=True, split=" "):
+    if lower:
+        text = text.lower()
+    translate_table = dict((ord(char), None) for char in filters)
+    text = text.translate(translate_table)
+    seq = text.split(split)
+    return [_f for _f in seq if _f]
 
 def text2sequence(text):
         '''
@@ -100,7 +130,7 @@ def text2sequence(text):
         :return a list of words:
         '''
         global number_of_tokens
-        sequence = T.text_to_word_sequence(text, filters=T.base_filter(), lower=True, split=" ")
+        sequence = text_to_word_sequence(text, filters=T.base_filter(), lower=True, split=" ")
         for i in range(len(sequence)):
             sequence[i]=re.sub(r'^[0-9]+$','<NUMBER>',sequence[i])
             number_of_tokens+=1
@@ -113,8 +143,7 @@ def generate(obj):
         number_of_tokens+=1
         sentences=string2sentences(getString(obj))
         for sentence in sentences:
-            #sequences.append(text2sequence(sentence))
-            sequences += text2sequence(sentence)
+            sequences.append(text2sequence(sentence))
         if not SELECTED_SUBREDDIT:
             write(FOUT_PATH, sequences)
         else:
