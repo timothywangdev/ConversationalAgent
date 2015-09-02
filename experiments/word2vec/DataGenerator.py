@@ -2,16 +2,11 @@ __author__ = 'Hujie Wang'
 
 import json
 import re
-import keras.preprocessing.text as T
-from tqdm import tqdm
 import time
 import string
 import codecs
 
-from progressbar import AnimatedMarker, Bar, BouncingBar, Counter, ETA, \
-     FileTransferSpeed, FormatLabel, Percentage, \
-    ProgressBar, ReverseBar, RotatingMarker, \
-    SimpleProgress, Timer
+from progressbar import Bar, ETA, Percentage, ProgressBar, RotatingMarker
 
 FLAGS = re.VERBOSE | re.MULTILINE | re.DOTALL
 WHITESPACE = re.compile(r'[ \t\n\r]*', FLAGS)
@@ -130,7 +125,7 @@ def text2sequence(text):
         :return a list of words:
         '''
         global number_of_tokens
-        sequence = text_to_word_sequence(text, filters=T.base_filter(), lower=True, split=" ")
+        sequence = text_to_word_sequence(text, filters=base_filter(), lower=True, split=" ")
         for i in range(len(sequence)):
             sequence[i]=re.sub(r'^[0-9]+$','<NUMBER>',sequence[i])
             number_of_tokens+=1
@@ -152,4 +147,3 @@ def generate(obj):
             with open('./data/'+party+'.aut', 'a') as author:
                 author.write(obj['author'])
                 author.write('\n')
-
