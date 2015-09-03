@@ -2,10 +2,12 @@ __author__ = 'Hujie Wang'
 
 import json
 import re
-import keras as T
 import time
-import os, sys
+import string
 import codecs
+import os, sys
+
+from progressbar import Bar, ETA, Percentage, ProgressBar, RotatingMarker
 
 FLAGS = re.VERBOSE | re.MULTILINE | re.DOTALL
 WHITESPACE = re.compile(r'[ \t\n\r]*', FLAGS)
@@ -15,53 +17,57 @@ number_of_tokens=0
 number_of_comments=0
 last_number_of_comments=0
 start_time=None
-comment_dict = dict()
-
-'''
-class ConcatJSONDecoder(json.JSONDecoder):
-    def decode(self, s, _w=WHITESPACE.match):
-        s_len = len(s)
-
-        objs = []
-        end = 0
-        while end != s_len:
-            obj, end = self.raw_decode(s, idx=_w(s, end).end())
-            end = _w(s, end).end()
-            generate(obj)
-        return None
-'''
+IDF_DICT = dict()
 
 def do(fname, subreddit=[]):
-	'''
-	:param fname(Reddit comment JSON file)
-	:      subreddit(a list of subreddit names)
-	:return a dict of JSON object:
-	'''
-	global start_time
-	global number_of_tokens
-	global number_of_comments
-	global last_number_of_comments
-	global FOUT_PATH
-	global SELECTED_SUBREDDIT
-	start_time = time.time()
-	number_of_tokens=0
-	number_of_comments=0
-	last_number_of_comments=0
-	SELECTED_SUBREDDIT=subreddit
-	print('Converting reddit comments into tokens...')
-	with open(fname) as data_file:
-		line = data_file.readline()
-		while line:
-			generate(json.loads(line))
-			line = data_file.readline()
-	if subreddit:
-		global comment_dict
-		with open('./data/word_idf', 'wb') as out:
-			for key, value in comment_dict.iteritems():
-				out.write(key + ' ' + str(value) + '\n')
-	print('Data generation completed!')
-	print('Number of comments:'+str(number_of_comments))
-	print('Number of tokens:'+str(number_of_tokens))
+        '''
+        :param fname(Reddit comment JSON file)
+        :      subreddit(a list of subreddit names)
+        :return a dict of JSON object:
+        '''
+        global start_time
+        global number_of_tokens
+        global number_of_comments
+        global last_number_of_comments
+        global FOUT_PATH
+        global SELECTED_SUBREDDIT
+        global comment_dict
+        start_time = time.time()
+        number_of_tokens=0
+        number_of_comments=0
+        last_number_of_comments=0
+        SELECTED_SUBREDDIT=subreddit
+        print('Converting reddit comments into tokens...')
+
+        widgets = ['Progress: ', Percentage(), ' ', Bar(marker=RotatingMarker()),
+               ' ', ETA()]
+
+        '''
+        maxval: number of json objects(lines) in a file (Each line is a json object)
+
+        data.json  (272  MB, time: 00:02:30): maxval=468317
+        RC_2015-03 (32.6 GB, time: 02:32:34): maxval=54564441
+        '''
+
+        pbar = ProgressBar(widgets=widgets, maxval=54564441).start()
+        nline=0
+        with open(fname) as data_file:
+            for line in data_file:
+                obj = json.loads(line)
+                generate(obj)
+                pbar.update(nline+1)
+                nline+=1
+        pbar.finish()
+
+        if subreddit:
+            with open('./data/word_idf', 'wb') as out:
+                for key, value in IDF_DICT.iteritems():
+                    out.write(key + ' ' + str(value) + '\n')
+
+        print('\n')
+        print('Data generation completed!')
+        print('Number of comments:'+str(number_of_comments))
+        print('Number of tokens:'+str(number_of_tokens))
 
 def getString(obj):
         '''
@@ -84,31 +90,13 @@ def string2sentences(str):
         return list(filter(bool,re.split(r'[;,.!?]+',str)))
 
 
-def write_comment(fname,sequences):
-        '''
-        Append list of tokens into a file(in binary), according to the data format of word2vec
-        :param fname:
-        :param l (list of strings):
-        '''
-        with open(fname,'ab') as fout:
-            for i in range(len(sequences)):
-                #for j in range(len(sequences[i])):
-                #fout.write(bytes(sequences[i], 'UTF-8'))
-                fout.write(bytes(sequences[i]))
-                if i!=len(sequences)-1:
-                    #fout.write(bytes(' ', 'UTF-8'))
-                    fout.write(bytes(' '))
-                else:
-                    #fout.write(bytes('\n', 'UTF-8'))
-                    fout.write(bytes('\n'))
-
 def write(fname,sequences):
         '''
         Append list of tokens into a file(in binary), according to the data format of word2vec
         :param fname:
         :param l (list of strings):
         '''
-        with codecs.open(fname,'ab') as fout:
+        with codecs.open(fname,'ab','utf-8') as fout:
             for i in range(len(sequences)):
                 if len(sequences[i])==0:
                     continue
@@ -119,56 +107,71 @@ def write(fname,sequences):
                     else:
                         fout.write(u'\n')
 
+def base_filter():
+    f = string.punctuation
+    f = f.replace("'", '')
+    f += '\t\n'
+    return f
+
+def text_to_word_sequence(text, filters=base_filter(), lower=True, split=" "):
+    if lower:
+        text = text.lower()
+    #translate_table = dict((ord(char), None) for char in filters)
+    #text = text.translate(translate_table)
+    text = text.translate(string.maketrans('',''), filters)
+    seq = text.split(split)
+    return [_f for _f in seq if _f]
+
 def text2sequence(text):
         '''
-        Convert a string into a list of words, filtering punctuations and irreverent symbols
-        :param text(a sttring):
+        Convert a string into a list of words, filtering punctuations and irrelevant symbols
+        :param text(a string):
         :return a list of words:
         '''
         global number_of_tokens
-        sequence = T.text_to_word_sequence(text, filters=T.base_filter(), lower=True, split=" ")
+        sequence = text_to_word_sequence(text, filters=base_filter(), lower=True, split=" ")
         for i in range(len(sequence)):
             sequence[i]=re.sub(r'^[0-9]+$','<NUMBER>',sequence[i])
+            # converts links to <URL>
+            sequence[i] = re.sub(r'(https?):((//)|(\\\\))+([\w\d:#@%/;$()~_?\+-=\\\.&](#!)?)*', '<URL>', sequence[i])
             number_of_tokens+=1
         return sequence
 
 def generate(obj):
-	global number_of_comments
-	number_of_comments+=1
-	if number_of_comments%100000==0:
-		print(number_of_comments)
-		#print(repr((number_of_comments-last_number_of_comments)/duration )+" comments per second" )
-		#last_number_of_comments=number_of_comments
+    global number_of_comments
+    number_of_comments+=1
+    if number_of_comments%100000==0:
+            print(number_of_comments)
+            #print(repr((number_of_comments-last_number_of_comments)/duration )+" comments per second" )
+            #last_number_of_comments=number_of_comments
 
-	#if obj['subreddit'] in SELECTED_SUBREDDIT or not SELECTED_SUBREDDIT:
-	sequences=[]
-	seq = []
-	global number_of_tokens
-	number_of_tokens+=1
-	sentences=string2sentences(getString(obj))
-	'''
-	space = " "
-	sentences=space.join(string2sentences(getString(obj)))
-	sequences = text2sequence(sentences)
-	sentences=string2sentences(getString(obj))
-	'''
-	for sentence in sentences:
-		sequences.append(text2sequence(sentence))
-		seq += sequences[-1]
-	#if not SELECTED_SUBREDDIT:
-	write(FOUT_PATH, sequences)
-	#else:
-	if obj['subreddit'] in SELECTED_SUBREDDIT:
-		distinct = set(seq)
-		global comment_dict
-		for word in distinct:
-			if word in comment_dict:
-				comment_dict[word] += 1
-			else:
-				comment_dict[word] = 1
-		party = obj['subreddit']
-		write_comment('./data/'+party+'.sub', seq)
-		with open('./data/'+party+'.aut', 'ab') as author:
-			author.write(obj['author'])
-			author.write('\n')
+    if obj['subreddit'] in SELECTED_SUBREDDIT or not SELECTED_SUBREDDIT:
+        sequences=[]
+        global number_of_tokens
+        number_of_tokens+=1
 
+        body = getString(obj)
+        if body == '[deleted]':
+            return
+        else:
+            sentences=string2sentences(body)
+
+        for sentence in sentences:
+            sequences.append(text2sequence(sentence))
+        if not SELECTED_SUBREDDIT:
+            write(FOUT_PATH, sequences)
+        else:
+            comment = [word for sentence in sequences for word in sentence]
+            for word in set(comment):
+                if word in IDF_DICT:
+                    IDF_DICT[word] += 1
+                else:
+                    IDF_DICT[word] = 1 
+            party = obj['subreddit']
+            space = " "
+            with open('./data/'+party+'.sub', 'ab') as sub:
+                sub.write(space.join(comment))
+                sub.write('\n')
+            with open('./data/'+party+'.aut', 'a') as author:
+                author.write(obj['author'])
+                author.write('\n')
