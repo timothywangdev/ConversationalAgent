@@ -142,8 +142,8 @@ def generate(obj):
         if body == '[deleted]':
             return
         else:
-            # remove links. maybe want to replace with token instead?
-            body = re.sub(r'(https?):((//)|(\\\\))+([\w\d:#@%/;$()~_?\+-=\\\.&](#!)?)*', '', body)
+            # converts links to <URL>
+            body = re.sub(r'(https?):((//)|(\\\\))+([\w\d:#@%/;$()~_?\+-=\\\.&](#!)?)*', '<URL>', body)
             sentences=string2sentences(body)
 
         for sentence in sentences:
