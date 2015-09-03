@@ -36,7 +36,7 @@ def do(fname, subreddit=[]):
         SELECTED_SUBREDDIT=subreddit
         print('Converting reddit comments into tokens...')
 
-        widgets = ['Speed: ', Percentage(), ' ', Bar(marker=RotatingMarker()),
+        widgets = ['Progress: ', Percentage(), ' ', Bar(marker=RotatingMarker()),
                ' ', ETA()]
 
         '''
@@ -56,6 +56,7 @@ def do(fname, subreddit=[]):
                 nline+=1
         pbar.finish()
 
+        print('\n')
         print('Data generation completed!')
         print('Number of comments:'+str(number_of_comments))
         print('Number of tokens:'+str(number_of_tokens))
@@ -65,7 +66,7 @@ def getString(obj):
         Return a list of strings given a JSON data
 
         :param data (JSON)
-        :return: a list of stringswjwsz
+        :return: a list of strings
         '''
         global number_of_comments
         global start_time
@@ -120,8 +121,8 @@ def text_to_word_sequence(text, filters=base_filter(), lower=True, split=" "):
 
 def text2sequence(text):
         '''
-        Convert a string into a list of words, filtering punctuations and irreverent symbols
-        :param text(a sttring):
+        Convert a string into a list of words, filtering punctuations and irrelevant symbols
+        :param text(a string):
         :return a list of words:
         '''
         global number_of_tokens
@@ -136,7 +137,15 @@ def generate(obj):
         sequences=[]
         global number_of_tokens
         number_of_tokens+=1
-        sentences=string2sentences(getString(obj))
+
+        body = getString(obj)
+        if body == '[deleted]':
+            return
+        else:
+            # remove links. maybe want to replace with token instead?
+            body = re.sub(r'(https?):((//)|(\\\\))+([\w\d:#@%/;$()~_?\+-=\\\.&](#!)?)*', '', body)
+            sentences=string2sentences(body)
+
         for sentence in sentences:
             sequences.append(text2sequence(sentence))
         if not SELECTED_SUBREDDIT:
