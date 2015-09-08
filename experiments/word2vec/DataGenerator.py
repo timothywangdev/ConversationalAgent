@@ -19,7 +19,7 @@ last_number_of_comments=0
 start_time=None
 IDF_DICT = dict()
 
-def do(fname, subreddit=[]):
+def do(fname, subreddit=[], min_score=float('-inf'), min_length=0):
         '''
         :param fname(Reddit comment JSON file)
         :      subreddit(a list of subreddit names)
@@ -54,13 +54,13 @@ def do(fname, subreddit=[]):
         with open(fname) as data_file:
             for line in data_file:
                 obj = json.loads(line)
-                generate(obj)
+                generate(obj, min_score, min_length)
                 pbar.update(nline+1)
                 nline+=1
         pbar.finish()
 
         if subreddit:
-            with open('./data/word_idf', 'wb') as out:
+            with codecs.open('./data/word_idf', 'wb', 'utf-8') as out:
                 for key, value in IDF_DICT.iteritems():
                     out.write(key + ' ' + str(value) + '\n')
 
@@ -80,7 +80,7 @@ def getString(obj):
         global last_number_of_comments
         current_time=time.time()
         #duration=int((current_time - start_time)*1000)
-        return obj['body'].encode('utf8')
+        return obj['body']
 
 def string2sentences(str):
         '''
@@ -116,9 +116,8 @@ def base_filter():
 def text_to_word_sequence(text, filters=base_filter(), lower=True, split=" "):
     if lower:
         text = text.lower()
-    #translate_table = dict((ord(char), None) for char in filters)
-    #text = text.translate(translate_table)
-    text = text.translate(string.maketrans('',''), filters)
+    translate_table = dict((ord(char), None) for char in filters)
+    text = text.translate(translate_table)
     seq = text.split(split)
     return [_f for _f in seq if _f]
 
@@ -137,7 +136,7 @@ def text2sequence(text):
             number_of_tokens+=1
         return sequence
 
-def generate(obj):
+def generate(obj, min_score, min_length):
     global number_of_comments
     number_of_comments+=1
     if number_of_comments%100000==0:
@@ -145,7 +144,8 @@ def generate(obj):
             #print(repr((number_of_comments-last_number_of_comments)/duration )+" comments per second" )
             #last_number_of_comments=number_of_comments
 
-    if obj['subreddit'] in SELECTED_SUBREDDIT or not SELECTED_SUBREDDIT:
+    if (obj['subreddit'] in SELECTED_SUBREDDIT or not SELECTED_SUBREDDIT) \
+    and obj['score'] > min_score:
         sequences=[]
         global number_of_tokens
         number_of_tokens+=1
@@ -155,23 +155,24 @@ def generate(obj):
             return
         else:
             sentences=string2sentences(body)
-
         for sentence in sentences:
             sequences.append(text2sequence(sentence))
-        if not SELECTED_SUBREDDIT:
-            write(FOUT_PATH, sequences)
-        else:
-            comment = [word for sentence in sequences for word in sentence]
-            for word in set(comment):
-                if word in IDF_DICT:
-                    IDF_DICT[word] += 1
-                else:
-                    IDF_DICT[word] = 1 
-            party = obj['subreddit']
-            space = " "
-            with open('./data/'+party+'.sub', 'ab') as sub:
-                sub.write(space.join(comment))
-                sub.write('\n')
-            with open('./data/'+party+'.aut', 'a') as author:
-                author.write(obj['author'])
-                author.write('\n')
+
+        if sum(len(x) for x in sequences) > min_length:
+            if not SELECTED_SUBREDDIT:
+                write(FOUT_PATH, sequences)
+            else:
+                comment = [word for sentence in sequences for word in sentence]
+                for word in set(comment):
+                    if word in IDF_DICT:
+                        IDF_DICT[word] += 1
+                    else:
+                        IDF_DICT[word] = 1 
+                party = obj['subreddit']
+                space = " "
+                with codecs.open('./data/'+party+'.sub', 'ab', 'utf-8') as sub:
+                    sub.write(space.join(comment))
+                    sub.write(u'\n')
+                with codecs.open('./data/'+party+'.aut', 'ab', 'utf-8') as author:
+                    author.write(obj['author'])
+                    author.write(u'\n')
